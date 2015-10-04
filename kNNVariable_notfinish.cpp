@@ -854,7 +854,7 @@ int main() {
   std::vector< std::vector<TH1D> > AllIntensityHistCol; AllIntensityHistCol.clear();
   AllIntensityHistCol = MakekNNroIDROOTFile(HIPoints, LIPoints, SIPoints);
 
-/*
+
   // Make kNN Variable Histograms for HIGH-LOW-SINGLE
   std::vector<TH1D> HIkNNVarHistCollection; HIkNNVarHistCollection.clear();
   std::vector<TH1D> LIkNNVarHistCollection; LIkNNVarHistCollection.clear();
@@ -864,6 +864,6 @@ int main() {
   SIkNNVarHistCollection = AllIntensityHistCol.at(2);
   // Ploting kNN Variables
   PlotkNNVariables(HIkNNVarHistCollection, LIkNNVarHistCollection, SIkNNVarHistCollection);
-*/
+
   return 0;
 }
