@@ -5,6 +5,7 @@
 #include <ctime>
 #include <cstdlib>
 #include <algorithm>
+#include <cmath>
 
 #include "TFile.h"
 #include "TTree.h"
@@ -46,9 +47,9 @@ void Welcome();
 std::vector< std::vector<Point> > Initialize(std::string, int, int, int);
 std::vector<Point> TestQuery(std::string, int, int);
 double GetDistributionWidth(std::vector<double>, double);
-static double DistancePID(const Point&, const Point&);
+double DistancePID(const Point&, const Point&);
 std::vector<TH1D> MakeVariableHistogram(std::vector<Point>, std::string);
-void MakekNNroIDROOTFile(std::vector<Point>, std::vector<Point>, std::vector<Point>);
+std::vector< std::vector<TH1D> > MakekNNroIDROOTFile(std::vector< std::vector<Point>>, std::vector< std::vector<Point> > , std::vector< std::vector<Point> >);
 void PlotkNNVariables(std::vector<TH1D>, std::vector<TH1D>, std::vector<TH1D>);
 double GetPID(std::vector<Point>, int, int, int);
 
@@ -285,11 +286,11 @@ double GetDistributionWidth(std::vector<double> vec, double width) {
 
 double DistancePID(const Point &p1, const Point &p2){
   double sumSq = 0.;
-  sumSq = pow(p1.knn01TrkActivePlanes - p2.knn01TrkActivePlanes, 2)
-        + pow(p1.knn10TrkMeanPh - p2.knn10TrkMeanPh, 2)
-        + pow(p1.knn20LowHighPh - p2.knn20LowHighPh, 2)
-        + pow(p1.knn40TrkPhFrac - p2.knn40TrkPhFrac, 2);
-  return sqrt(sumSq);
+  sumSq = std::pow(p1.knn01TrkActivePlanes - p2.knn01TrkActivePlanes, 2)
+        + std::pow(p1.knn10TrkMeanPh - p2.knn10TrkMeanPh, 2)
+        + std::pow(p1.knn20LowHighPh - p2.knn20LowHighPh, 2)
+        + std::pow(p1.knn40TrkPhFrac - p2.knn40TrkPhFrac, 2);
+  return std::sqrt(sumSq);
 }
 
 double GetPID(std::vector<Point> testPoints, int i, int testNN, int IntensityType){
@@ -351,7 +352,7 @@ std::vector<TH1D> MakeVariableHistogram(std::vector<Point> trainPoints, std::str
   TH1D* h_knn10TrkMeanPh = new TH1D(str_hname_knn10TrkMeanPh.c_str(), str_h_knn10TrkMeanPh.c_str(), 34, binsch_knn10);
   TH1D* h_knn20LowHighPh = new TH1D(str_hname_knn20LowHighPh.c_str(), str_h_knn20LowHighPh.c_str(), 80, 0, 3);
   TH1D* h_knn40TrkPhFrac = new TH1D(str_hname_knn40TrkPhFrac.c_str(), str_h_knn40TrkPhFrac.c_str(), 80, 0, 2);
-  TH1D* hS_knn01TrkActivePlanes = new TH1D(str_h_knn01TrkActivePlanes.c_str(), str_hS_knn01TrkActivePlanes.c_str(), 80, 0, 2.2);
+  TH1D* hS_knn01TrkActivePlanes = new TH1D(str_hname_knn01TrkActivePlanes.c_str(), str_hS_knn01TrkActivePlanes.c_str(), 80, 0, 2.2);
   TH1D* hS_knn10TrkMeanPh = new TH1D(str_hSname_knn10TrkMeanPh.c_str(), str_hS_knn10TrkMeanPh.c_str(), 34, binsch_knn10);
   TH1D* hS_knn20LowHighPh = new TH1D(str_hSname_knn20LowHighPh.c_str(), str_hS_knn20LowHighPh.c_str(), 80, 0, 3);
   TH1D* hS_knn40TrkPhFrac = new TH1D(str_hSname_knn40TrkPhFrac.c_str(), str_hS_knn40TrkPhFrac.c_str(), 80, 0, 2);
@@ -421,7 +422,7 @@ std::vector<TH1D> MakeVariableHistogram(std::vector<Point> trainPoints, std::str
   return kNNVarHistCollection;
 }
 
-void MakekNNroIDROOTFile(std::vector<Point> HI, std::vector<Point> LI, std::vector<Point> SI) {
+std::vector< std::vector<TH1D> > MakekNNroIDROOTFile(std::vector< std::vector<Point> > HI, std::vector< std::vector<Point> > LI, std::vector< std::vector<Point> > SI) {
   TFile f("kNNroID.root", "recreate");
   TTree t_HI("t_HI","roID for HIGH intensity");
   TTree t_LI("t_LI","roID for LOW intensity");
@@ -441,6 +442,18 @@ void MakekNNroIDROOTFile(std::vector<Point> HI, std::vector<Point> LI, std::vect
   Float_t knn10TrkMeanPh;
   Float_t knn20LowHighPh;
   Float_t knn40TrkPhFrac;
+
+  std::vector<TH1D> HIHistsCol; HIHistsCol.clear();
+  std::vector<TH1D> LIHistsCol; LIHistsCol.clear();
+  std::vector<TH1D> SIHistsCol; SIHistsCol.clear();
+  HIHistsCol = MakeVariableHistogram(HI.at(0), "High");
+  LIHistsCol = MakeVariableHistogram(LI.at(0), "Low");
+  SIHistsCol = MakeVariableHistogram(SI.at(0), "Single");
+  for (int i = 0; i < 12; i++) {
+    HIHistsCol.at(i).Write();
+    LIHistsCol.at(i).Write();
+    SIHistsCol.at(i).Write();
+  }
 
   t_HI.Branch("signalMC", &signalMC,"signalMC/O");
   t_HI.Branch("dungpid_60", &dungpid_60,"dungpid_60/D");
@@ -487,64 +500,72 @@ void MakekNNroIDROOTFile(std::vector<Point> HI, std::vector<Point> LI, std::vect
   t_SI.Branch("knn20LowHighPh", &knn20LowHighPh,"knn20LowHighPh/F");
   t_SI.Branch("knn40TrkPhFrac", &knn40TrkPhFrac,"knn40TrkPhFrac/F");
 
-  for (int i = 0; i < HI.size(); i++) {
-    signalMC = SI[i].signalMC;
-    dungpid_60 = SI[i].dungpid_60;
-    dungpid_70 = SI[i].dungpid_70;
-    dungpid_80 = SI[i].dungpid_80;
-    dungpid_90 = SI[i].dungpid_90;
-    dungpid_100 = SI[i].dungpid_100;
-    dungpid_110 = SI[i].dungpid_110;
-    dungpid_120 = SI[i].dungpid_120;
-    dungpid_130 = SI[i].dungpid_130;
-    dungpid_140 = SI[i].dungpid_140;
-    knn01TrkActivePlanes = SI[i].knn01TrkActivePlanes;
-    knn10TrkMeanPh = SI[i].knn10TrkMeanPh;
-    knn20LowHighPh = SI[i].knn20LowHighPh;
-    knn40TrkPhFrac = SI[i].knn40TrkPhFrac;
+  for (int i = 0; i < HI.at(1).size(); i++) {
+    signalMC = SI.at(1).at(i).signalMC;
+    dungpid_60 = SI.at(1).at(i).dungpid_60;
+    dungpid_70 = SI.at(1).at(i).dungpid_70;
+    dungpid_80 = SI.at(1).at(i).dungpid_80;
+    dungpid_90 = SI.at(1).at(i).dungpid_90;
+    dungpid_100 = SI.at(1).at(i).dungpid_100;
+    dungpid_110 = SI.at(1).at(i).dungpid_110;
+    dungpid_120 = SI.at(1).at(i).dungpid_120;
+    dungpid_130 = SI.at(1).at(i).dungpid_130;
+    dungpid_140 = SI.at(1).at(i).dungpid_140;
+    knn01TrkActivePlanes = SI.at(1).at(i).knn01TrkActivePlanes;
+    knn10TrkMeanPh = SI.at(1).at(i).knn10TrkMeanPh;
+    knn20LowHighPh = SI.at(1).at(i).knn20LowHighPh;
+    knn40TrkPhFrac = SI.at(1).at(i).knn40TrkPhFrac;
     t_HI.Fill();
   }
   t_HI.Write();
 
-  for (int i = 0; i < LI.size(); i++) {
-    signalMC = LI[i].signalMC;
-    dungpid_60 = LI[i].dungpid_60;
-    dungpid_70 = LI[i].dungpid_70;
-    dungpid_80 = LI[i].dungpid_80;
-    dungpid_90 = LI[i].dungpid_90;
-    dungpid_100 = LI[i].dungpid_100;
-    dungpid_110 = LI[i].dungpid_110;
-    dungpid_120 = LI[i].dungpid_120;
-    dungpid_130 = LI[i].dungpid_130;
-    dungpid_140 = LI[i].dungpid_140;
-    knn01TrkActivePlanes = LI[i].knn01TrkActivePlanes;
-    knn10TrkMeanPh = LI[i].knn10TrkMeanPh;
-    knn20LowHighPh = LI[i].knn20LowHighPh;
-    knn40TrkPhFrac = LI[i].knn40TrkPhFrac;
+  for (int i = 0; i < LI.at(1).size(); i++) {
+    signalMC = LI.at(1).at(i).signalMC;
+    dungpid_60 = LI.at(1).at(i).dungpid_60;
+    dungpid_70 = LI.at(1).at(i).dungpid_70;
+    dungpid_80 = LI.at(1).at(i).dungpid_80;
+    dungpid_90 = LI.at(1).at(i).dungpid_90;
+    dungpid_100 = LI.at(1).at(i).dungpid_100;
+    dungpid_110 = LI.at(1).at(i).dungpid_110;
+    dungpid_120 = LI.at(1).at(i).dungpid_120;
+    dungpid_130 = LI.at(1).at(i).dungpid_130;
+    dungpid_140 = LI.at(1).at(i).dungpid_140;
+    knn01TrkActivePlanes = LI.at(1).at(i).knn01TrkActivePlanes;
+    knn10TrkMeanPh = LI.at(1).at(i).knn10TrkMeanPh;
+    knn20LowHighPh = LI.at(1).at(i).knn20LowHighPh;
+    knn40TrkPhFrac = LI.at(1).at(i).knn40TrkPhFrac;
     t_LI.Fill();
   }
   t_LI.Write();
 
-  for (int i = 0; i < SI.size(); i++) {
-    signalMC = SI[i].signalMC;
-    dungpid_60 = SI[i].dungpid_60;
-    dungpid_70 = SI[i].dungpid_70;
-    dungpid_80 = SI[i].dungpid_80;
-    dungpid_90 = SI[i].dungpid_90;
-    dungpid_100 = SI[i].dungpid_100;
-    dungpid_110 = SI[i].dungpid_110;
-    dungpid_120 = SI[i].dungpid_120;
-    dungpid_130 = SI[i].dungpid_130;
-    dungpid_140 = SI[i].dungpid_140;
-    knn01TrkActivePlanes = SI[i].knn01TrkActivePlanes;
-    knn10TrkMeanPh = SI[i].knn10TrkMeanPh;
-    knn20LowHighPh = SI[i].knn20LowHighPh;
-    knn40TrkPhFrac = SI[i].knn40TrkPhFrac;
+  for (int i = 0; i < SI.at(1).size(); i++) {
+    signalMC = SI.at(1).at(i).signalMC;
+    dungpid_60 = SI.at(1).at(i).dungpid_60;
+    dungpid_70 = SI.at(1).at(i).dungpid_70;
+    dungpid_80 = SI.at(1).at(i).dungpid_80;
+    dungpid_90 = SI.at(1).at(i).dungpid_90;
+    dungpid_100 = SI.at(1).at(i).dungpid_100;
+    dungpid_110 = SI.at(1).at(i).dungpid_110;
+    dungpid_120 = SI.at(1).at(i).dungpid_120;
+    dungpid_130 = SI.at(1).at(i).dungpid_130;
+    dungpid_140 = SI.at(1).at(i).dungpid_140;
+    knn01TrkActivePlanes = SI.at(1).at(i).knn01TrkActivePlanes;
+    knn10TrkMeanPh = SI.at(1).at(i).knn10TrkMeanPh;
+    knn20LowHighPh = SI.at(1).at(i).knn20LowHighPh;
+    knn40TrkPhFrac = SI.at(1).at(i).knn40TrkPhFrac;
     t_SI.Fill();
   }
   t_SI.Write();
 
   f.Write();
+  f.Close();
+
+  std::vector< std::vector<TH1D> > AllIntensityHistCol;
+  AllIntensityHistCol.push_back(HIHistsCol);
+  AllIntensityHistCol.push_back(LIHistsCol);
+  AllIntensityHistCol.push_back(SIHistsCol);
+
+  return AllIntensityHistCol;
 }
 
 void PlotkNNVariables(std::vector<TH1D> HI, std::vector<TH1D> LI, std::vector<TH1D> SI) {
@@ -829,30 +850,20 @@ int main() {
   LIPoints = Initialize("./I2.5E15fullDST.root", 220000, 2, 2);
   SIPoints = Initialize("./ISinglefullDST.root", 220000, 2, 3);
 
+  // Make kNN roID with different k values
+  std::vector< std::vector<TH1D> > AllIntensityHistCol; AllIntensityHistCol.clear();
+  AllIntensityHistCol = MakekNNroIDROOTFile(HIPoints, LIPoints, SIPoints);
+
+/*
   // Make kNN Variable Histograms for HIGH-LOW-SINGLE
-  std::vector<TH1D> HIkNNVarHistCollection;
-  std::vector<TH1D> LIkNNVarHistCollection;
-  std::vector<TH1D> SIkNNVarHistCollection;
-  std::vector<TH1D> HIkNNVarHistCollectionCopy1;
-  std::vector<TH1D> LIkNNVarHistCollectionCopy1;
-  std::vector<TH1D> SIkNNVarHistCollectionCopy1;
-  std::vector<TH1D> HIkNNVarHistCollectionCopy2;
-  std::vector<TH1D> LIkNNVarHistCollectionCopy2;
-  std::vector<TH1D> SIkNNVarHistCollectionCopy2;
-  HIkNNVarHistCollection = MakeVariableHistogram(HIPoints.at(0), "High");
-  LIkNNVarHistCollection = MakeVariableHistogram(LIPoints.at(0), "Low");
-  SIkNNVarHistCollection = MakeVariableHistogram(SIPoints.at(0), "Single");
-  HIkNNVarHistCollectionCopy1 = HIkNNVarHistCollection;
-  LIkNNVarHistCollectionCopy1 = LIkNNVarHistCollection;
-  SIkNNVarHistCollectionCopy1 = SIkNNVarHistCollection;
-  HIkNNVarHistCollectionCopy2 = HIkNNVarHistCollection;
-  LIkNNVarHistCollectionCopy2 = LIkNNVarHistCollection;
-  SIkNNVarHistCollectionCopy2 = SIkNNVarHistCollection;
+  std::vector<TH1D> HIkNNVarHistCollection; HIkNNVarHistCollection.clear();
+  std::vector<TH1D> LIkNNVarHistCollection; LIkNNVarHistCollection.clear();
+  std::vector<TH1D> SIkNNVarHistCollection; SIkNNVarHistCollection.clear();
+  HIkNNVarHistCollection = AllIntensityHistCol.at(0);
+  LIkNNVarHistCollection = AllIntensityHistCol.at(1);
+  SIkNNVarHistCollection = AllIntensityHistCol.at(2);
   // Ploting kNN Variables
   PlotkNNVariables(HIkNNVarHistCollection, LIkNNVarHistCollection, SIkNNVarHistCollection);
-
-  // Make kNN roID with different k values
-  MakekNNroIDROOTFile(HIPoints.at(1), LIPoints.at(1), SIPoints.at(1));
-
+*/
   return 0;
 }
